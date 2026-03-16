@@ -29,9 +29,12 @@ export default function ChatWidget({ aiContext }) {
     setLoading(true);
 
     try {
+      const token = localStorage.getItem('token');
       const res = await axios.post(`${API_URL}/api/chat`, {
         message: text,
         context: aiContext || '',
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       setMessages((prev) => [
         ...prev,

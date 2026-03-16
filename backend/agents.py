@@ -102,26 +102,136 @@ class ForecastAgent:
         return result
 
 
+class SubscriptionAgent:
+    """Identifies potential recurring subscriptions based on keywords."""
+    SUB_KEYWORDS = ["netflix", "spotify", "gym", "aws", "prime", "subscription", "membership"]
+
+    def run(self, df: pd.DataFrame) -> list[dict]:
+        subs = []
+        for _, row in df.iterrows():
+            desc = str(row["Description"]).lower()
+            if any(k in desc for k in self.SUB_KEYWORDS):
+                # Simple logic for reminder: assume it's roughly monthly from the last date
+                subs.append({
+                    "date": str(row["Date"]),
+                    "description": row["Description"],
+                    "amount": float(row["Amount"]),
+                    "next_due": (pd.to_datetime(row["Date"]) + pd.DateOffset(months=1)).strftime("%Y-%m-%d")
+                })
+        return subs
+
+class MultiMonthAgent:
+    """Groups transactions by month and analyzes performance monthly."""
+    def run(self, df: pd.DataFrame) -> list[dict]:
+        df = df.copy()
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        df = df.dropna(subset=["Date"])
+        
+        try:
+            monthly = df.groupby(df["Date"].dt.to_period("M"))
+        except:
+            return []
+
+        results = []
+        for period, group in monthly:
+            results.append({
+                "month": str(period),
+                "income": float(group[group["Amount"] > 0]["Amount"].sum()),
+                "expense": float(abs(group[group["Amount"] < 0]["Amount"].sum())),
+            })
+        return results
+
+class TaxAgent:
+    """Identifies potential tax-deductible expenses and estimates tax."""
+    DEDUCTION_KEYWORDS = ["insurance", "investment", "charity", "education", "donation", "medical"]
+
+    def run(self, df: pd.DataFrame) -> dict:
+        deductibles = []
+        total_income = float(df[df["Amount"] > 0]["Amount"].sum())
+        
+        for _, row in df.iterrows():
+            desc = str(row["Description"]).lower()
+            if any(k in desc for k in self.DEDUCTION_KEYWORDS):
+                deductibles.append({"description": row["Description"], "amount": float(abs(row["Amount"]))})
+        
+        total_deductions = sum(d["amount"] for d in deductibles)
+        taxable_income = max(0, total_income - total_deductions)
+        # Simplified 15% tax estimate
+        estimated_tax = taxable_income * 0.15
+        
+        return {
+            "deductibles": deductibles,
+            "total_deductions": total_deductions,
+            "estimated_tax": estimated_tax,
+            "taxable_income": taxable_income
+        }
+
+class PersonalizedBudgetAgent:
+    """Analyzes historical category spending to suggest realistic limits."""
+    def run(self, category_spending: dict) -> dict:
+        suggested = {}
+        for cat, amount in category_spending.items():
+            # Suggest a limit 10% higher than average or current
+            suggested[cat] = round(amount * 1.1, -2) # Round to nearest 100
+        return suggested
+
+
+class SavingsGoalAgent:
+    """Analyzes budget surplus to recommend dynamic savings allocation."""
+    def run(self, budget_summary: dict) -> dict:
+        surplus = budget_summary["income"] - budget_summary["expense"]
+        if surplus <= 0:
+            return {"status": "No Surplus", "emergency": 0, "investment": 0, "guilt_free": 0}
+        
+        return {
+            "status": "Surplus Available",
+            "emergency": surplus * 0.50,
+            "investment": surplus * 0.30,
+            "guilt_free": surplus * 0.20,
+            "total_surplus": surplus
+        }
+
+
 class AdvisorAgent:
     """Evaluates health score and formats financial context for the AI chat."""
 
-    def run(self, health_score: int) -> str:
-        if health_score > 75:
-            return "🟢 Strong financial stability. Consider diversified investments."
-        elif health_score > 50:
-            return "🟡 Moderate financial health. Optimize discretionary spending."
-        else:
-            return "🔴 Financial risk detected. Immediate expense correction advised."
+    def run(self, budget_summary: dict, budget_alerts: list, subs: list) -> list[str]:
+        recommendations = []
+        health_score = budget_summary.get("health_score", 0)
 
-    def build_context(self, budget_summary: dict, category_spending: dict) -> str:
+        # Health Level
+        if health_score > 75:
+            recommendations.append("🟢 Your financial health is excellent. Focus on long-term wealth building.")
+        elif health_score > 50:
+            recommendations.append("🟡 Your finances are stable, but there is room to optimize discretionary spending.")
+        else:
+            recommendations.append("🔴 Financial risk detected. We recommend immediate review of high-cost categories.")
+
+        # Specific Insights
+        if budget_alerts:
+            overspent = [a['category'] for a in budget_alerts if a['severity'] == 'exceeded']
+            if overspent:
+                recommendations.append(f"⚠️ You've exceeded your budget in: {', '.join(overspent)}. Try to cut back here next month.")
+        
+        if len(subs) > 3:
+            recommendations.append(f"🔍 You have {len(subs)} recurring subscriptions. Reviewing these could save you significant monthly costs.")
+
+        if budget_summary['income'] > budget_summary['expense'] * 1.5:
+             recommendations.append("💰 Pro Tip: You have a healthy surplus. Consider increasing your SIP or Emergency Fund allocation.")
+
+        return recommendations
+
+    def build_context(self, budget_summary: dict, category_spending: dict, subs: list, savings: dict) -> str:
         return (
             f"User Financial Summary:\n"
             f"- Total Income: ₹{budget_summary['income']:,.2f}\n"
             f"- Total Expense: ₹{budget_summary['expense']:,.2f}\n"
             f"- Financial Health Score: {budget_summary['health_score']}/100\n"
             f"- Category-wise Spending: {category_spending}\n"
+            f"- Identified Subscriptions: {len(subs)} found. Examples: {[s['description'] for s in subs[:3]]}\n"
+            f"- Recommended Savings Plan: {savings}\n"
             f"\nYou are CareBank AI, a personalized financial wellness advisor. "
-            f"Use the above data to give specific, actionable advice."
+            f"Use the above data to give specific, actionable advice in a friendly, professional tone."
         )
 
 
@@ -134,6 +244,11 @@ class Orchestrator:
         self.budget = BudgetAgent()
         self.forecast = ForecastAgent()
         self.advisor = AdvisorAgent()
+        self.subscription = SubscriptionAgent()
+        self.savings = SavingsGoalAgent()
+        self.multimonth = MultiMonthAgent()
+        self.tax = TaxAgent()
+        self.personal_budget = PersonalizedBudgetAgent()
 
     def execute(self, df: pd.DataFrame, budgets: dict | None = None) -> dict:
         # 1. Categorize spending
@@ -148,8 +263,9 @@ class Orchestrator:
         # 4. Generate forecast
         forecast = self.forecast.run(df)
 
-        # 5. Get advisor recommendation
-        advice = self.advisor.run(budget_summary["health_score"])
+        # 5. New Agents: Subscriptions and Savings Goal
+        subs = self.subscription.run(df)
+        savings_plan = self.savings.run(budget_summary)
 
         # 6. Category-wise spending breakdown
         expense_df = df[df["Amount"] < 0].copy()
@@ -186,8 +302,20 @@ class Orchestrator:
                         }
                     )
 
+        # 8. Get advisor recommendations (Moved here to use alerts and subs)
+        advice = self.advisor.run(budget_summary, budget_alerts, subs)
+
         # Build context for chat
-        ai_context = self.advisor.build_context(budget_summary, category_spending)
+        ai_context = self.advisor.build_context(budget_summary, category_spending, subs, savings_plan)
+
+        # 9. Multi-month trends
+        monthly_trends = self.multimonth.run(df)
+
+        # 10. Tax Estimation
+        tax_info = self.tax.run(df)
+
+        # 11. Personalized Budgets
+        suggested_budgets = self.personal_budget.run(category_spending)
 
         return {
             "budget_summary": budget_summary,
@@ -197,4 +325,9 @@ class Orchestrator:
             "advice": advice,
             "budget_alerts": budget_alerts,
             "ai_context": ai_context,
+            "subscriptions": subs,
+            "savings_plan": savings_plan,
+            "monthly_trends": monthly_trends,
+            "tax_info": tax_info,
+            "suggested_budgets": suggested_budgets
         }
