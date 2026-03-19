@@ -1,0 +1,21 @@
+# CareBank AI - Full Stack Dependency Manifest
+
+# Backend Requirements
+fastapi
+uvicorn
+sqlalchemy
+pandas
+numpy
+scikit-learn
+python-dotenv
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+google-generativeai
+pdfplumber
+httpx
+
+# For legacy components or general utilities
+openai
+plotly
+streamlit
