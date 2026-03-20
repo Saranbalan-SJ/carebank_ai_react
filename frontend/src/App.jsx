@@ -9,10 +9,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import { BarChart3, ShieldCheck } from 'lucide-react';
 import './index.css';
-<<<<<<< HEAD
-=======
 import ForgotPassword from "./pages/ForgotPassword";
->>>>>>> friend/main
 
 const API_URL = 'http://localhost:8000';
 
@@ -119,10 +116,10 @@ function MainView({ token, role, onLogout, theme, toggleTheme }) {
         ) : !loading ? (
           <div className="welcome-container">
             <div className="welcome-icon">🏦</div>
-            <h2 className="welcome-title">Welcome to CareBank AI</h2>
+            <h2 className="welcome-title">Welcome to CareBank</h2>
             <p className="welcome-subtitle">
               Upload your transaction CSV or PDF and set your budget limits to unlock
-              AI-powered financial insights, anomaly detection, and personalized advice.
+              financial insights, anomaly detection, and humanized advice.
             </p>
             <div className="welcome-features">
               <div className="welcome-feature">
