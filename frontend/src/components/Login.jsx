@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, User } from 'lucide-react';
+import { Lock, User, Eye, EyeOff } from 'lucide-react';
 
 const API_URL = 'http://localhost:8000';
 
 function Login({ setAuth }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [show, setShow] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -40,7 +41,7 @@ function Login({ setAuth }) {
         <div className="auth-header">
           <div className="auth-icon">🏦</div>
           <h2>Welcome Back</h2>
-          <p>Login to CareBank AI</p>
+          <p>Login to CareBank</p>
         </div>
         
         {error && <div className="alert-item danger"><span>{error}</span></div>}
@@ -61,17 +62,40 @@ function Login({ setAuth }) {
           </div>
           <div className="form-group">
             <label>Password</label>
-            <div className="input-with-icon">
+            <div className="input-with-icon" style={{ position: 'relative' }}>
               <Lock size={18} />
               <input 
-                type="password" 
+                type={show ? "text" : "password"} 
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)} 
                 required 
                 placeholder="••••••••"
+                style={{ paddingRight: '40px' }}
               />
+              <span 
+                onClick={() => setShow(!show)} 
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  cursor: "pointer",
+                  color: "var(--text-muted)",
+                  display: "flex",
+                  alignItems: "center"
+                }}
+              >
+                {show ? <EyeOff size={18} /> : <Eye size={18} />}
+              </span>
             </div>
           </div>
+          
+          <div style={{ textAlign: 'right', marginBottom: '20px' }}>
+            <Link to="/forgot-password" style={{ fontSize: '0.85rem', color: 'var(--accent-primary)', textDecoration: 'none' }}>
+              Forgot Password?
+            </Link>
+          </div>
+
           <button type="submit" className="primary-btn" disabled={loading}>
             {loading ? 'Logging in...' : 'Login'}
           </button>

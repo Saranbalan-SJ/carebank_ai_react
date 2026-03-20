@@ -9,6 +9,10 @@ import Login from './components/Login';
 import Register from './components/Register';
 import { BarChart3, ShieldCheck } from 'lucide-react';
 import './index.css';
+<<<<<<< HEAD
+=======
+import ForgotPassword from "./pages/ForgotPassword";
+>>>>>>> friend/main
 
 const API_URL = 'http://localhost:8000';
 
@@ -170,6 +174,7 @@ function App() {
     <Routes>
       <Route path="/login" element={<Login setAuth={handleSetAuth} />} />
       <Route path="/register" element={<Register setAuth={handleSetAuth} />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route
         path="/"
         element={

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, User, Users } from 'lucide-react';
+import { Lock, User } from 'lucide-react';
 
 const API_URL = 'http://localhost:8000';
 
@@ -18,9 +18,13 @@ function Register({ setAuth }) {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post(`${API_URL}/api/register`, { username, password, role });
-      const { access_token, role } = res.data;
-      setAuth(access_token, role || 'customer');
+      const res = await axios.post(`${API_URL}/api/register`, {
+        username,
+        password,
+        role
+      });
+      const { access_token, role: userRole } = res.data;
+      setAuth(access_token, userRole);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed');
@@ -35,7 +39,7 @@ function Register({ setAuth }) {
         <div className="auth-header">
           <div className="auth-icon">🏦</div>
           <h2>Create Account</h2>
-          <p>Join CareBank AI</p>
+          <p>Join CareBank</p>
         </div>
         
         {error && <div className="alert-item danger"><span>{error}</span></div>}
@@ -68,22 +72,28 @@ function Register({ setAuth }) {
             </div>
           </div>
 
-          <div className="form-group">
-            <label>I am a...</label>
-            <div className="input-with-icon">
-              <Users size={18} />
-              <select 
-                value={role} 
-                onChange={(e) => setRole(e.target.value)}
-                style={{ width: '100%', cursor: 'pointer' }}
-              >
-                <option value="customer">Customer (View My Health)</option>
-                <option value="banker">Bank Manager (Oversight Portal)</option>
-              </select>
+          <label style={{ fontSize: '0.9rem', marginBottom: '10px', display: 'block' }}>I am a...</label>
+          <div className="role-selection">
+            <div
+              className={`role-card ${role === "customer" ? "active" : ""}`}
+              onClick={() => setRole("customer")}
+            >
+              <div className="role-icon">👤</div>
+              <h4>Customer</h4>
+              <p>Manage finances</p>
+            </div>
+
+            <div
+              className={`role-card ${role === "banker" ? "active" : ""}`}
+              onClick={() => setRole("banker")}
+            >
+              <div className="role-icon">👔</div>
+              <h4>Banker</h4>
+              <p>Monitor portal</p>
             </div>
           </div>
 
-          <button type="submit" className="primary-btn" disabled={loading}>
+          <button type="submit" className="primary-btn" disabled={loading} style={{ marginTop: '20px' }}>
             {loading ? 'Creating account...' : 'Sign Up'}
           </button>
         </form>

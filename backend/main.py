@@ -68,6 +68,10 @@ class ChatRequest(BaseModel):
     message: str
     context: str = ""
 
+class ResetPasswordRequest(BaseModel):
+    username: str
+    new_password: str
+
 class SavingsGoalCreate(BaseModel):
     name: str
     target: float
@@ -125,6 +129,16 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
         "token_type": "bearer",
         "role": user.role
     }
+
+@app.post("/api/reset-password")
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.username == request.username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.hashed_password = auth.get_password_hash(request.new_password)
+    db.commit()
+    return {"message": "Password reset successfully"}
 
 @app.get("/api/admin/customers")
 def get_all_customers(db: Session = Depends(get_db), current_admin: models.User = Depends(auth.get_current_admin)):
