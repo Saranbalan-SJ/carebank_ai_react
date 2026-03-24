@@ -192,6 +192,65 @@ class SavingsGoalAgent:
         }
 
 
+class FraudDetectionAgent:
+    """Detects potentially faked or manipulated transaction data."""
+
+    def run(self, df: pd.DataFrame) -> dict:
+        if df.empty:
+            return {"reliability_score": 100, "public_flags": [], "private_flags": []}
+
+        public_flags = []
+        private_flags = []
+        deductions = 0
+
+        # 1. Duplicate Detection
+        duplicates = df.duplicated(subset=["Date", "Description", "Amount"]).sum()
+        if duplicates > 0:
+            dup_ratio = duplicates / len(df)
+            if dup_ratio > 0.1:
+                private_flags.append(f"High duplicate ratio ({dup_ratio:.1%}) detected.")
+                public_flags.append("Repeated transaction patterns detected.")
+                deductions += int(dup_ratio * 100)
+
+        # 2. Round Number Bias
+        round_nums = df["Amount"].apply(lambda x: x % 100 == 0).sum()
+        round_ratio = round_nums / len(df)
+        if round_ratio > 0.8 and len(df) > 5:
+            private_flags.append(f"High frequency of round numbers ({round_ratio:.1%}). Possible manual entry.")
+            public_flags.append("Unnatural transaction amounts (Manual entry behavior).")
+            deductions += 20
+
+        # 3. Benford's Law
+        first_digits = df["Amount"].abs().astype(str).str.lstrip('0.').str[0]
+        first_digits = first_digits[first_digits.isin(['1','2','3','4','5','6','7','8','9'])]
+        
+        if len(first_digits) >= 5:
+            one_count = (first_digits == '1').sum() / len(first_digits)
+            if one_count < 0.20 or one_count > 0.45:
+                private_flags.append(f"Benford's Law violation: '1' frequency is {one_count:.1%}.")
+                public_flags.append("Statistical distribution anomaly detected.")
+                deductions += 30
+
+        # 4. Temporal Consistency
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        df = df.dropna(subset=["Date"]).sort_values("Date")
+        if len(df) > 5:
+            intervals = df["Date"].diff().dt.days
+            if intervals.std() < 0.5:
+                 private_flags.append(f"Temporal regularity check failed: StdDev={intervals.std():.2f}")
+                 public_flags.append("Unusual transaction regularity.")
+                 deductions += 15
+
+        reliability_score = max(0, 100 - deductions)
+        
+        return {
+            "reliability_score": reliability_score,
+            "public_flags": public_flags,
+            "private_flags": private_flags,
+            "status": "Verified" if reliability_score > 80 else "Suspicious" if reliability_score > 50 else "Likely Manipulated"
+        }
+
+
 class WealthAssistantAgent:
     """Evaluates health score and formats financial context for the chat assistant."""
 
@@ -249,6 +308,7 @@ class Orchestrator:
         self.multimonth = MultiMonthAgent()
         self.tax = TaxAgent()
         self.personal_budget = PersonalizedBudgetAgent()
+        self.fraud = FraudDetectionAgent()
 
     def execute(self, df: pd.DataFrame, budgets: dict | None = None) -> dict:
         # 1. Categorize spending
@@ -302,9 +362,17 @@ class Orchestrator:
                         }
                     )
 
-        # 8. Get advisor recommendations 
+        # 8. Fraud & Reliability Check
+        fraud_analysis = self.fraud.run(df)
+        reliability_score = fraud_analysis["reliability_score"]
+
+        # 9. Get advisor recommendations 
         advice = self.assistant.run(budget_summary, budget_alerts, subs)
  
+        if reliability_score < 60:
+            public_warnings = ", ".join(fraud_analysis["public_flags"])
+            advice.append(f"⚠️ Security Notice: Our fraud detection agent has flagged this data as '{fraud_analysis['status']}'. Reason: {public_warnings or 'Statistical inconsistency'}.")
+
          # Build context for chat
         ai_context = self.assistant.build_context(budget_summary, category_spending, subs, savings_plan)
 
@@ -316,6 +384,20 @@ class Orchestrator:
 
         # 11. Personalized Budgets
         suggested_budgets = self.personal_budget.run(category_spending)
+
+        # 12. Create AI Notifications for "Proactive" feel
+        notifications = []
+        for alert in budget_alerts:
+            notifications.append({"icon": "AlertTriangle", "message": alert["message"], "type": alert["severity"]})
+        
+        if fraud_analysis["reliability_score"] < 80:
+            notifications.append({"icon": "ShieldAlert", "message": f"Security: Data reliability is {fraud_analysis['reliability_score']}% - Check for anomalies.", "type": "warning"})
+        
+        if tax_info["total_deductions"] > 0:
+            notifications.append({"icon": "Calculator", "message": f"Tax Savings: Found ₹{tax_info['total_deductions']:,.0f} in potential deductions.", "type": "success"})
+        
+        if "Great job" in savings_plan["status"]:
+            notifications.append({"icon": "Target", "message": "Savings Goal: Your current surplus covers your emergency fund target!", "type": "success"})
 
         return {
             "budget_summary": budget_summary,
@@ -329,5 +411,7 @@ class Orchestrator:
             "savings_plan": savings_plan,
             "monthly_trends": monthly_trends,
             "tax_info": tax_info,
-            "suggested_budgets": suggested_budgets
+            "suggested_budgets": suggested_budgets,
+            "fraud_analysis": fraud_analysis,
+            "notifications": notifications
         }

@@ -26,7 +26,7 @@ const CATEGORIES = [
   { key: 'Other', label: 'Other', icon: MoreHorizontal, default: 2000 },
 ];
 
-export default function Sidebar({ onAnalyze, loading, onLogout, role = 'customer', token, theme, toggleTheme }) {
+export default function Sidebar({ onAnalyze, loading, onLogout, role = 'customer', token, theme, toggleTheme, notifications = [] }) {
   const [showNotifs, setShowNotifs] = useState(false);
   const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
@@ -89,19 +89,8 @@ export default function Sidebar({ onAnalyze, loading, onLogout, role = 'customer
           <button className="icon-btn" onClick={toggleTheme} title="Toggle Dark/Light Mode">
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button className="icon-btn" onClick={() => setShowNotifs(true)} title="Notifications">
-            <Bell size={18} />
-          </button>
+          <NotificationsPanel notifications={notifications} />
         </div>
-
-        <NotificationsPanel 
-          isOpen={showNotifs} 
-          onClose={() => setShowNotifs(false)} 
-          notifications={[
-            { type: 'warning', title: 'Low Health Score', message: 'Your health score dropped below 50. Review spending.', time: '2h ago' },
-            { type: 'success', title: 'Goal Progress', message: 'You reached 80% of your "New Car" goal!', time: '1d ago' }
-          ]}
-        />
 
         {role === 'banker' && (
           <div style={{ marginTop: 8, fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', padding: '4px 8px', background: 'rgba(99, 102, 241, 0.2)', color: '#a5b4fc', borderRadius: 4, display: 'inline-block' }}>

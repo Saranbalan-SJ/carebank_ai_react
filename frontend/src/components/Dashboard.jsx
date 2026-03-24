@@ -44,6 +44,31 @@ export default function Dashboard({ data, token }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [showTour, setShowTour] = useState(localStorage.getItem('onboarding_done') !== 'true');
   const [tourStep, setTourStep] = useState(0);
+  const [simAmount, setSimAmount] = useState('');
+  const [simCategory, setSimCategory] = useState('Shopping');
+  const [simResult, setSimResult] = useState(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  const handleSimulate = async () => {
+    if (!simAmount) return;
+    setIsSimulating(true);
+    try {
+        const res = await fetch('http://localhost:8000/api/simulate', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ amount: Number(simAmount), category: simCategory })
+        });
+        const data = await res.json();
+        setSimResult(data);
+    } catch (err) {
+        console.error("Simulation failed", err);
+    } finally {
+        setIsSimulating(false);
+    }
+  };
 
   const tourSteps = [
     { title: 'Welcome to CareBank', content: 'Your personal financial wellness companion. Let\'s get you started!', icon: '💳' },
@@ -73,7 +98,8 @@ export default function Dashboard({ data, token }) {
     subscriptions,
     monthly_trends,
     tax_info,
-    savings_plan
+    savings_plan,
+    fraud_analysis
   } = data;
 
   // Pie data
@@ -116,6 +142,22 @@ export default function Dashboard({ data, token }) {
           <div className="kpi-value score">
             {budget_summary?.health_score ?? '—'}
             <span style={{ fontSize: '1rem', fontWeight: 400, opacity: 0.6 }}>/100</span>
+            {fraud_analysis && (
+              <div 
+                title={fraud_analysis.public_flags?.join('\n')}
+                style={{ 
+                  marginTop: 8, 
+                  fontSize: '0.7rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 4,
+                  color: fraud_analysis.reliability_score > 80 ? '#10b981' : fraud_analysis.reliability_score > 50 ? '#f59e0b' : '#ef4444'
+                }}
+              >
+                {fraud_analysis.reliability_score > 80 ? <ShieldCheck size={14} /> : <AlertTriangle size={14} />}
+                {fraud_analysis.status}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -185,6 +227,96 @@ export default function Dashboard({ data, token }) {
             ))
           ) : <div className="alert-item success">All spending is within budget limits.</div>}
         </div>
+      </div>
+
+      <div className="advisor-card" style={{ marginBottom: 24, border: '1px solid rgba(167, 139, 250, 0.2)', background: 'rgba(167, 139, 250, 0.05)' }}>
+        <div className="chart-title" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Calculator size={18} style={{ color: '#a78bfa' }} /> What-If Simulator 🔮
+            </div>
+            <span style={{ fontSize: '0.7rem', color: '#a78bfa', fontWeight: 600, letterSpacing: '0.05em' }}>PREDICTIVE AI</span>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, marginBottom: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Purchase Amount (₹)</label>
+                <input 
+                    type="number" 
+                    value={simAmount} 
+                    onChange={(e) => setSimAmount(e.target.value)}
+                    placeholder="e.g. 50000"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px', color: 'white' }}
+                />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Category</label>
+                <select 
+                    value={simCategory} 
+                    onChange={(e) => setSimCategory(e.target.value)}
+                    style={{ 
+                        background: '#1e293b', 
+                        border: '1px solid rgba(255,255,255,0.1)', 
+                        borderRadius: 8, 
+                        padding: '10px', 
+                        color: 'white',
+                        appearance: 'none',
+                        cursor: 'pointer'
+                    }}
+                >
+                    <option value="Shopping" style={{ background: '#1e293b' }}>Shopping</option>
+                    <option value="Food" style={{ background: '#1e293b' }}>Food</option>
+                    <option value="Transport" style={{ background: '#1e293b' }}>Transport</option>
+                    <option value="Other" style={{ background: '#1e293b' }}>Other</option>
+                </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button 
+                    className="primary-btn" 
+                    onClick={handleSimulate}
+                    disabled={isSimulating}
+                    style={{ height: 42, padding: '0 24px' }}
+                >
+                    {isSimulating ? 'Analyzing...' : 'Simulate'}
+                </button>
+            </div>
+        </div>
+
+        {simResult && (
+            <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: 16, borderLeft: '4px solid #a78bfa' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>Health Score Impact</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>
+                                {simResult.projected_health_score} <span style={{ fontSize: '0.9rem', opacity: 0.5 }}>/100</span>
+                            </div>
+                            <div style={{ 
+                                color: simResult.projected_health_score < budget_summary.health_score ? '#ef4444' : '#10b981',
+                                fontSize: '0.8rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 2
+                            }}>
+                                {simResult.projected_health_score < budget_summary.health_score ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
+                                {Math.abs(simResult.projected_health_score - budget_summary.health_score)} pts
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>Budget Alerts</div>
+                        {simResult.alerts.length > 0 ? (
+                            simResult.alerts.map((a, i) => (
+                                <div key={i} style={{ fontSize: '0.7rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <AlertTriangle size={12} /> {a.category} limit at risk!
+                                </div>
+                            ))
+                        ) : (
+                            <div style={{ fontSize: '0.7rem', color: '#10b981' }}>Safe purchase. No budget risk.</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
       </div>
 
       <div className="advisor-card">

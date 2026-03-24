@@ -91,6 +91,7 @@ function MainView({ token, role, onLogout, theme, toggleTheme }) {
         theme={theme}
         toggleTheme={toggleTheme}
         activeTab={role === 'banker' ? 'manager' : 'dashboard'}
+        notifications={data?.notifications || []}
       />
 
       <main className="main-content">
