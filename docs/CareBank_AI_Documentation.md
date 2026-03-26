@@ -1,7 +1,7 @@
 # CareBank AI — Project Documentation
 
 **Project:** CareBank AI — Financial Wellness Platform  
-**Submitted for:** Vidyutrendz Competition  
+**Submitted for:** Virtusa jatayu 
 **Date:** March 26, 2026  
 **GitHub:** https://github.com/Navaneee7/carebank_ai_react
 
